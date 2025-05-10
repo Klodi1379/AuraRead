@@ -1,0 +1,12 @@
+This is a sample document to test the AuraRead application.
+
+AuraRead is an innovative web application that transforms how users interact with PDF documents by offering advanced audio reading, intuitive annotation tools, and a personalized experience for studying and consuming information.
+
+Key Features:
+- PDF document upload and management
+- Text extraction from PDF documents
+- Text-to-Speech functionality for reading document content
+- Annotation and highlighting of document text
+- User authentication and profile management
+
+This sample document can be converted to PDF and used for testing the application.

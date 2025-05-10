@@ -1,0 +1,210 @@
+/* Document Viewer Styles */
+
+.document-viewer {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.document-container {
+  display: flex;
+  gap: 20px;
+}
+
+.document-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.document-content {
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  margin-top: 20px;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Error message styling */
+.error-message {
+  background-color: #fff3f3;
+  border-left: 4px solid #ff5252;
+  padding: 12px 15px;
+  margin: 15px 0;
+  border-radius: 4px;
+  color: #d32f2f;
+}
+
+.error-message strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.error-help {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ffcdd2;
+  font-size: 0.9em;
+  color: #555;
+}
+
+.error-help p {
+  margin-bottom: 8px;
+}
+
+.error-help ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.error-help li {
+  margin-bottom: 5px;
+}
+
+/* TTS highlighting */
+.highlight.tts-sentence {
+  background-color: rgba(255, 255, 0, 0.2);
+  border-radius: 2px;
+}
+
+.highlight.tts-word {
+  background-color: rgba(255, 255, 0, 0.5);
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+/* Annotation highlighting */
+.highlight.annotation {
+  background-color: rgba(255, 255, 0, 0.3);
+  border-bottom: 1px dotted #ffd700;
+  cursor: help;
+}
+
+/* Audio controls */
+.audio-button {
+  padding: 8px 16px;
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.audio-button:hover {
+  background-color: #3367d6;
+}
+
+.audio-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.audio-button.loading {
+  background-color: #cccccc;
+  cursor: wait;
+}
+
+.audio-button.stop {
+  background-color: #ea4335;
+}
+
+.audio-button.stop:hover {
+  background-color: #d32f2f;
+}
+
+/* TTS Engine Selector */
+.tts-engine-selector {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.tts-engine-select {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin: 0 10px;
+  font-size: 14px;
+}
+
+.tts-engine-description {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Voice Selector */
+.voice-selector {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.voice-select {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin: 0 10px;
+  font-size: 14px;
+  min-width: 250px;
+}
+
+.loading-voices {
+  margin-left: 10px;
+  font-style: italic;
+  color: #666;
+}
+
+/* Language Selector */
+.language-selector {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+}
+
+.language-select {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin: 0 10px;
+  font-size: 14px;
+}
+
+/* Themes */
+.light-theme {
+  background-color: #ffffff;
+  color: #333333;
+}
+
+.sepia-theme {
+  background-color: #f8f1e3;
+  color: #5b4636;
+}
+
+.dark-theme {
+  background-color: #222222;
+  color: #e0e0e0;
+}
+
+.dark-theme .document-content {
+  border-color: #444;
+  background-color: #333;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .document-container {
+    flex-direction: column;
+  }
+
+  .annotations-sidebar {
+    width: 100%;
+  }
+}

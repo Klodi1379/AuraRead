@@ -12,6 +12,7 @@ from documents.models import Document
 from documents.api.serializers import DocumentSerializer
 from documents.pdf_utils import extract_text_from_pdf, get_pdf_info
 from documents.tts_service import tts_service
+from documents.enhanced_tts_service import enhanced_tts_service
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
@@ -94,8 +95,25 @@ class DocumentViewSet(viewsets.ModelViewSet):
         Get a list of available TTS voices from all engines.
         """
         try:
-            logger.debug("Getting available TTS voices")
-            voices = tts_service.get_available_voices()
+            logger.info("Getting available TTS voices")
+
+            # Try to get voices from the enhanced TTS service first
+            try:
+                voices = enhanced_tts_service.get_available_voices()
+                # Add online voices
+                voices['online'] = [
+                    {'id': 'voicerss_en-us', 'name': 'English (US)', 'language': 'en-us'},
+                    {'id': 'voicerss_en-gb', 'name': 'English (UK)', 'language': 'en-gb'},
+                    {'id': 'voicerss_fr-fr', 'name': 'French', 'language': 'fr-fr'},
+                    {'id': 'voicerss_de-de', 'name': 'German', 'language': 'de-de'},
+                    {'id': 'voicerss_es-es', 'name': 'Spanish', 'language': 'es-es'},
+                    {'id': 'voicerss_it-it', 'name': 'Italian', 'language': 'it-it'},
+                ]
+                logger.info(f"Found {len(voices['windows_sapi'])} Windows SAPI voices, {len(voices['pyttsx3'])} pyttsx3 voices, and {len(voices['online'])} online voices")
+            except Exception as e:
+                logger.warning(f"Enhanced TTS service failed to get voices: {str(e)}, falling back to original TTS service")
+                voices = tts_service.get_available_voices()
+
             return Response(voices)
         except Exception as e:
             logger.error("Error getting available voices: %s", str(e), exc_info=True)
@@ -110,8 +128,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
         Expects 'text' parameter in the request data.
         """
         try:
-            logger.debug("Converting text to speech for document with pk: %s", pk)
+            logger.info("Converting text to speech for document with pk: %s", pk)
             document = self.get_object()
+
+            # Log authentication information
+            logger.info("User: %s, Auth: %s", request.user.username, request.auth)
 
             # Handle both JSON and form data
             if isinstance(request.data, dict):
@@ -130,7 +151,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 if isinstance(prefer_offline, str):
                     prefer_offline = prefer_offline.lower() == 'true'
 
-            logger.debug("Received text for TTS: %s", text[:100] + "..." if len(text) > 100 else text)
+            logger.info("Received text for TTS: %s (length: %d chars)",
+                       text[:50] + "..." if len(text) > 50 else text,
+                       len(text))
 
             if not text:
                 logger.warning("No text provided for TTS conversion")
@@ -138,21 +161,35 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
             # Use provided language or fall back to document language
             tts_language = language if language else document.language
-            logger.debug("Using language for TTS: %s", tts_language)
-            logger.debug("Using voice name: %s", voice_name)
+            logger.info("Using language for TTS: %s", tts_language)
+            logger.info("Using voice name: %s", voice_name)
+            logger.info("Prefer offline TTS: %s", prefer_offline)
 
             # Create a temporary file for the audio
             temp_filename = None
             try:
-                logger.debug("Using TTS service with prefer_offline=%s", prefer_offline)
+                logger.info("Starting TTS conversion with service...")
 
-                # Use our TTS service to generate audio
-                temp_filename = tts_service.text_to_speech(
-                    text=text,
-                    language=tts_language,
-                    prefer_offline=prefer_offline,
-                    voice_name=voice_name
-                )
+                # Try the enhanced TTS service first, fall back to the original if it fails
+                try:
+                    logger.info("Using enhanced TTS service...")
+                    temp_filename = enhanced_tts_service.text_to_speech(
+                        text=text,
+                        language=tts_language,
+                        prefer_offline=prefer_offline,
+                        voice_name=voice_name
+                    )
+                    logger.info("Enhanced TTS conversion successful, generated file: %s", temp_filename)
+                except Exception as e:
+                    logger.warning(f"Enhanced TTS service failed: {str(e)}, falling back to original TTS service")
+                    # Fall back to the original TTS service
+                    temp_filename = tts_service.text_to_speech(
+                        text=text,
+                        language=tts_language,
+                        prefer_offline=prefer_offline,
+                        voice_name=voice_name
+                    )
+                    logger.info("Original TTS conversion successful, generated file: %s", temp_filename)
 
                 # Check that the file exists and has content
                 if not os.path.exists(temp_filename) or os.path.getsize(temp_filename) == 0:
@@ -189,11 +226,33 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 if temp_filename and os.path.exists(temp_filename):
                     try:
                         os.remove(temp_filename)
-                    except:
-                        pass
+                        logger.info("Cleaned up temporary file after error: %s", temp_filename)
+                    except Exception as cleanup_error:
+                        logger.error("Failed to clean up temporary file: %s", str(cleanup_error))
+
+                # Check if it's a rate limiting error
+                error_message = str(e)
+                if "429" in error_message or "Too Many Requests" in error_message:
+                    logger.warning("TTS rate limit reached")
+                    return Response({
+                        'error': 'TTS rate limit reached. Please try again later or with a smaller text selection.'
+                    }, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
                 raise
         except Exception as e:
             logger.error("Error in TTS conversion: %s", str(e), exc_info=True)
-            return Response({
-                'error': f'Error generating speech: {str(e)}'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Provide more specific error messages based on the exception
+            error_message = str(e)
+            if "No such file or directory" in error_message:
+                return Response({
+                    'error': 'TTS engine not properly installed or configured. Please check server logs.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            elif "voice" in error_message.lower():
+                return Response({
+                    'error': 'Selected voice not available or not properly configured.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                return Response({
+                    'error': f'Error generating speech: {error_message}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

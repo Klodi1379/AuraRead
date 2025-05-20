@@ -14,9 +14,12 @@ export const fetchAnnotations = createAsyncThunk(
   'annotations/fetchAnnotations',
   async (documentId, { rejectWithValue }) => {
     try {
+      console.log(`Fetching annotations for document: ${documentId}`);
       const response = await annotationService.getAnnotations(documentId);
+      console.log(`Annotations fetched successfully:`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`Error fetching annotations:`, error);
       const errorData = error.response?.data || error.message;
       return rejectWithValue(formatErrorMessage(errorData));
     }
@@ -72,6 +75,7 @@ const annotationsSlice = createSlice({
   },
   reducers: {
     clearAnnotations: (state) => {
+      // Always reset to an empty array
       state.annotations = [];
     },
   },
@@ -84,7 +88,8 @@ const annotationsSlice = createSlice({
       })
       .addCase(fetchAnnotations.fulfilled, (state, action) => {
         state.loading = false;
-        state.annotations = action.payload;
+        // Ensure annotations is always an array
+        state.annotations = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchAnnotations.rejected, (state, action) => {
         state.loading = false;
@@ -97,6 +102,10 @@ const annotationsSlice = createSlice({
       })
       .addCase(createAnnotation.fulfilled, (state, action) => {
         state.loading = false;
+        // Ensure annotations is an array before pushing
+        if (!Array.isArray(state.annotations)) {
+          state.annotations = [];
+        }
         state.annotations.push(action.payload);
       })
       .addCase(createAnnotation.rejected, (state, action) => {
@@ -110,6 +119,11 @@ const annotationsSlice = createSlice({
       })
       .addCase(updateAnnotation.fulfilled, (state, action) => {
         state.loading = false;
+        // Ensure annotations is an array before updating
+        if (!Array.isArray(state.annotations)) {
+          state.annotations = [];
+          return;
+        }
         const index = state.annotations.findIndex(a => a.id === action.payload.id);
         if (index !== -1) {
           state.annotations[index] = action.payload;
@@ -126,6 +140,11 @@ const annotationsSlice = createSlice({
       })
       .addCase(deleteAnnotation.fulfilled, (state, action) => {
         state.loading = false;
+        // Ensure annotations is an array before filtering
+        if (!Array.isArray(state.annotations)) {
+          state.annotations = [];
+          return;
+        }
         state.annotations = state.annotations.filter(a => a.id !== action.payload);
       })
       .addCase(deleteAnnotation.rejected, (state, action) => {

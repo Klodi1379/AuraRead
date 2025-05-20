@@ -105,11 +105,18 @@ const DocumentList = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('Fetching documents...');
         setLocalError(null);
-        await dispatch(fetchDocuments()).unwrap();
+        const resultAction = await dispatch(fetchDocuments()).unwrap();
+        console.log('Documents fetched successfully:', resultAction);
       } catch (err) {
         console.error('Error fetching documents:', err);
         setLocalError(err.toString());
+
+        // Check if it's an authentication error
+        if (err.includes('Authentication') || err.includes('credentials') || err.includes('token')) {
+          setLocalError('Authentication error. Please try logging in again.');
+        }
       }
     };
 
@@ -159,9 +166,17 @@ const DocumentList = () => {
         <FaExclamationCircle className="error-icon" />
         <h2>Something went wrong</h2>
         <p>Error: {error || localError}</p>
-        <button onClick={() => dispatch(fetchDocuments())} className="btn btn-primary">
-          Try Again
-        </button>
+
+        {(error || localError)?.includes('Authentication') ? (
+          <div>
+            <p>It looks like you may need to log in again.</p>
+            <a href="/login" className="btn btn-primary">Go to Login</a>
+          </div>
+        ) : (
+          <button onClick={() => dispatch(fetchDocuments())} className="btn btn-primary">
+            Try Again
+          </button>
+        )}
       </div>
     </div>
   );

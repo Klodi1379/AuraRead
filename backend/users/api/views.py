@@ -13,9 +13,22 @@ class UserDetailView(generics.RetrieveAPIView):
     """
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get_object(self):
         return self.request.user
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            print(f"User details retrieved for: {instance.username}")
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"Error retrieving user details: {str(e)}")
+            return Response(
+                {'error': f'Error retrieving user details: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class RegisterView(generics.CreateAPIView):
@@ -25,12 +38,12 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
-    
+
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        
+
         token, created = Token.objects.get_or_create(user=user)
         return Response({
             'user': UserSerializer(user).data,
@@ -43,22 +56,27 @@ class LoginView(APIView):
     Login a user and return a token
     """
     permission_classes = [permissions.AllowAny]
-    
+
     def post(self, request, *args, **kwargs):
         username = request.data.get('username')
         password = request.data.get('password')
-        
+
         if not username or not password:
-            return Response({'error': 'Please provide both username and password'}, 
+            return Response({'error': 'Please provide both username and password'},
                             status=status.HTTP_400_BAD_REQUEST)
-        
+
         user = authenticate(username=username, password=password)
-        
+
         if not user:
-            return Response({'error': 'Invalid credentials'}, 
+            return Response({'error': 'Invalid credentials'},
                             status=status.HTTP_401_UNAUTHORIZED)
-        
+
+        # Create or get the auth token
         token, created = Token.objects.get_or_create(user=user)
+
+        # Log the successful login
+        print(f"User {username} logged in successfully. Token: {token.key[:5]}...")
+
         return Response({
             'user': UserSerializer(user).data,
             'token': token.key
@@ -70,12 +88,12 @@ class LogoutView(APIView):
     Logout a user
     """
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def post(self, request):
         # Delete the token to logout
         try:
             request.user.auth_token.delete()
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
         return Response({'success': 'Successfully logged out'}, status=status.HTTP_200_OK)

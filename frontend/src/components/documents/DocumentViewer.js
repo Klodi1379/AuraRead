@@ -190,16 +190,19 @@ const DocumentViewer = () => {
 
     let text = extractedText;
 
-    // Sort annotations by start_offset in descending order to avoid offset shifts
-    const sortedAnnotations = [...annotations].sort((a, b) => b.start_offset - a.start_offset);
+    // Ensure annotations is an array
+    if (Array.isArray(annotations) && annotations.length > 0) {
+      // Sort annotations by start_offset in descending order to avoid offset shifts
+      const sortedAnnotations = [...annotations].sort((a, b) => b.start_offset - a.start_offset);
 
-    for (const annotation of sortedAnnotations) {
-      const { start_offset, end_offset } = annotation;
-      const beforeText = text.substring(0, start_offset);
-      const highlightedText = text.substring(start_offset, end_offset);
-      const afterText = text.substring(end_offset);
+      for (const annotation of sortedAnnotations) {
+        const { start_offset, end_offset } = annotation;
+        const beforeText = text.substring(0, start_offset);
+        const highlightedText = text.substring(start_offset, end_offset);
+        const afterText = text.substring(end_offset);
 
-      text = beforeText + `<span class="highlight" data-annotation-id="${annotation.id}" title="${annotation.note}">${highlightedText}</span>` + afterText;
+        text = beforeText + `<span class="highlight" data-annotation-id="${annotation.id}" title="${annotation.note}">${highlightedText}</span>` + afterText;
+      }
     }
 
     return <div dangerouslySetInnerHTML={{ __html: text }} />;
@@ -259,7 +262,7 @@ const DocumentViewer = () => {
 
       <div className="annotations-panel">
         <h3>Annotations</h3>
-        {annotations.length === 0 ? (
+        {!Array.isArray(annotations) || annotations.length === 0 ? (
           <p>No annotations yet. Select text to create annotations.</p>
         ) : (
           <ul>

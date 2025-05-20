@@ -24,13 +24,30 @@ const LoginForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(login({ username, password }));
+    try {
+      console.log('Attempting login with username:', username);
+      const resultAction = await dispatch(login({ username, password }));
+      console.log('Login result:', resultAction);
+
+      if (login.fulfilled.match(resultAction)) {
+        console.log('Login successful, redirecting to documents page');
+      } else if (login.rejected.match(resultAction)) {
+        console.error('Login failed:', resultAction.payload);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+    }
   };
 
   return (
     <div className="login-form">
       <h2>Login to AuraRead</h2>
-      {error && <div className="error-message">{error}</div>}
+      {error && (
+        <div className="error-message">
+          <p><strong>Error:</strong> {error}</p>
+          <p className="error-help">Please check your username and password and try again.</p>
+        </div>
+      )}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="username">Username</label>

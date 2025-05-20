@@ -38,7 +38,7 @@ const languageOptions = [
 // TTS engine options
 const ttsEngineOptions = [
   { name: 'Offline (Local)', value: true, description: 'Uses your computer\'s built-in TTS engine. Works without internet but may have limited language support.' },
-  { name: 'Online (Google)', value: false, description: 'Uses Google\'s TTS service. Better quality but requires internet and may have rate limits.' },
+  { name: 'Online (VoiceRSS)', value: false, description: 'Uses VoiceRSS TTS service. Better quality but requires internet connection.' },
 ];
 
 const EnhancedDocumentViewer = () => {
@@ -93,10 +93,16 @@ const EnhancedDocumentViewer = () => {
 
   useEffect(() => {
     if (id) {
+      console.log(`Loading document and annotations for ID: ${id}`);
       dispatch(fetchDocument(id));
       dispatch(fetchAnnotations(id));
     }
   }, [dispatch, id]);
+
+  // Debug annotations when they change
+  useEffect(() => {
+    console.log('Current annotations state:', annotations);
+  }, [annotations]);
 
   useEffect(() => {
     // Fetch the extracted text once we have the document
@@ -233,18 +239,110 @@ const EnhancedDocumentViewer = () => {
   // TTS engine handler
   const handleTTSEngineChange = (e) => {
     const value = e.target.value === 'true'; // Convert string to boolean
+    console.log(`TTS engine changed to: ${value ? 'Offline' : 'Online'}`);
     setPreferOfflineTTS(value);
+
+    // Store the previous voice selection for potential future use
+    const previousVoice = selectedVoice;
+    console.log(`Previous voice selection: "${previousVoice || 'none'}"`);
+
+    // Reset selected voice when changing engines
+    setSelectedVoice(null);
 
     // Clear audio cache when changing engines
     setCachedAudio({});
+
+    // Fetch appropriate voices for the selected engine
+    if (value) {
+      // For offline (Windows SAPI), try to select a voice matching the current language
+      if (availableVoices.windows_sapi && availableVoices.windows_sapi.length > 0) {
+        console.log(`Selecting from ${availableVoices.windows_sapi.length} Windows SAPI voices`);
+
+        // First try to find a voice matching the current language
+        const langCode = currentLanguage.toLowerCase().replace('_', '-');
+        console.log(`Looking for voice with language code: "${langCode}"`);
+
+        const matchingVoice = availableVoices.windows_sapi.find(
+          voice => voice.language.toLowerCase().includes(langCode)
+        );
+
+        if (matchingVoice) {
+          console.log(`Found matching voice for language "${langCode}": "${matchingVoice.id}" (${matchingVoice.name})`);
+          setSelectedVoice(matchingVoice.id);
+        } else {
+          // Default to the first voice
+          const firstVoice = availableVoices.windows_sapi[0];
+          console.log(`No matching voice found for language "${langCode}", defaulting to first voice: "${firstVoice.id}" (${firstVoice.name})`);
+          setSelectedVoice(firstVoice.id);
+        }
+
+        // Log all available Windows voices for debugging
+        console.log('Available Windows SAPI voices:');
+        availableVoices.windows_sapi.forEach((voice, index) => {
+          console.log(`${index + 1}. ID: "${voice.id}", Name: "${voice.name}", Language: "${voice.language}"`);
+        });
+      } else {
+        console.log('No Windows SAPI voices available');
+      }
+    } else {
+      // For online, select a VoiceRSS voice matching the current language
+      if (availableVoices.online && availableVoices.online.length > 0) {
+        console.log(`Selecting from ${availableVoices.online.length} online voices`);
+
+        const langCode = currentLanguage.toLowerCase().replace('_', '-');
+        console.log(`Looking for voice with language code: "${langCode}"`);
+
+        const matchingVoice = availableVoices.online.find(
+          voice => voice.language.toLowerCase().includes(langCode)
+        );
+
+        if (matchingVoice) {
+          console.log(`Found matching voice for language "${langCode}": "${matchingVoice.id}" (${matchingVoice.name})`);
+          setSelectedVoice(matchingVoice.id);
+        } else {
+          // Default to English US
+          const defaultVoice = availableVoices.online.find(voice => voice.language === 'en-us');
+          if (defaultVoice) {
+            console.log(`No matching voice found for language "${langCode}", defaulting to English US: "${defaultVoice.id}" (${defaultVoice.name})`);
+            setSelectedVoice(defaultVoice.id);
+          } else {
+            console.log('No default English US voice found, using first available voice');
+            setSelectedVoice(availableVoices.online[0].id);
+          }
+        }
+
+        // Log all available online voices for debugging
+        console.log('Available online voices:');
+        availableVoices.online.forEach((voice, index) => {
+          console.log(`${index + 1}. ID: "${voice.id}", Name: "${voice.name}", Language: "${voice.language}"`);
+        });
+      } else {
+        console.log('No online voices available');
+      }
+    }
   };
 
   // Voice selection handler
   const handleVoiceChange = (e) => {
-    setSelectedVoice(e.target.value);
+    const newVoice = e.target.value;
+    console.log(`Voice changed to: "${newVoice}"`);
+    setSelectedVoice(newVoice);
 
     // Clear audio cache when changing voice
     setCachedAudio({});
+
+    // Log the selected voice details for debugging
+    if (preferOfflineTTS && availableVoices.windows_sapi) {
+      const selectedVoiceDetails = availableVoices.windows_sapi.find(voice => voice.id === newVoice);
+      if (selectedVoiceDetails) {
+        console.log('Selected Windows SAPI voice details:', selectedVoiceDetails);
+      }
+    } else if (!preferOfflineTTS && availableVoices.online) {
+      const selectedVoiceDetails = availableVoices.online.find(voice => voice.id === newVoice);
+      if (selectedVoiceDetails) {
+        console.log('Selected online voice details:', selectedVoiceDetails);
+      }
+    }
   };
 
   // Annotation handlers
@@ -427,6 +525,14 @@ const EnhancedDocumentViewer = () => {
           console.log(`Using ${preferOfflineTTS ? 'offline' : 'online'} TTS engine`);
 
           // Use the API service to convert text to speech with the current language, engine preference, and voice
+          console.log('Making TTS request with params:', {
+            documentId: id,
+            textLength: textToRead.length,
+            language: currentLanguage,
+            preferOffline: preferOfflineTTS,
+            voice: selectedVoice || 'default'
+          });
+
           const response = await documentService.convertToSpeech(
             id,
             textToRead,
@@ -519,17 +625,37 @@ const EnhancedDocumentViewer = () => {
 
     let text = extractedText;
 
-    // Sort annotations by start_offset in descending order to avoid offset shifts
-    const sortedAnnotations = [...annotations].sort((a, b) => b.start_offset - a.start_offset);
+    console.log('Rendering document with annotations:', annotations);
 
-    // Add annotation highlights
-    for (const annotation of sortedAnnotations) {
-      const { start_offset, end_offset } = annotation;
-      const beforeText = text.substring(0, start_offset);
-      const highlightedText = text.substring(start_offset, end_offset);
-      const afterText = text.substring(end_offset);
+    // Ensure annotations is an array
+    if (Array.isArray(annotations) && annotations.length > 0) {
+      try {
+        // Sort annotations by start_offset in descending order to avoid offset shifts
+        const sortedAnnotations = [...annotations].sort((a, b) => b.start_offset - a.start_offset);
+        console.log('Sorted annotations:', sortedAnnotations);
 
-      text = beforeText + `<span class="highlight annotation" data-annotation-id="${annotation.id}" title="${annotation.note}">${highlightedText}</span>` + afterText;
+        // Add annotation highlights
+        for (const annotation of sortedAnnotations) {
+          const { start_offset, end_offset } = annotation;
+
+          // Validate offsets
+          if (typeof start_offset !== 'number' || typeof end_offset !== 'number' ||
+              start_offset < 0 || end_offset > text.length || start_offset >= end_offset) {
+            console.error('Invalid annotation offsets:', annotation);
+            continue;
+          }
+
+          console.log(`Highlighting annotation: ${annotation.id}, offsets: ${start_offset}-${end_offset}`);
+
+          const beforeText = text.substring(0, start_offset);
+          const highlightedText = text.substring(start_offset, end_offset);
+          const afterText = text.substring(end_offset);
+
+          text = beforeText + `<span class="highlight annotation" data-annotation-id="${annotation.id}" title="${annotation.note || ''}">${highlightedText}</span>` + afterText;
+        }
+      } catch (error) {
+        console.error('Error rendering annotations:', error);
+      }
     }
 
     // Add TTS sentence and word highlighting if active
@@ -733,42 +859,52 @@ const EnhancedDocumentViewer = () => {
               </div>
             </div>
 
-            {/* Voice selector - only show when offline engine is selected */}
-            {preferOfflineTTS && (
-              <div className="voice-selector">
-                <label htmlFor="voice-select" className="control-label">
-                  Voice:
-                </label>
-                {loadingVoices ? (
-                  <span className="loading-voices">Loading voices...</span>
-                ) : (
-                  <select
-                    id="voice-select"
-                    value={selectedVoice || ''}
-                    onChange={handleVoiceChange}
-                    className="voice-select"
-                    disabled={loadingVoices}
-                  >
-                    <optgroup label="Windows Voices">
-                      {availableVoices.windows_sapi && availableVoices.windows_sapi.map(voice => (
-                        <option key={voice.id} value={voice.id}>
-                          {voice.name} ({voice.language})
-                        </option>
-                      ))}
-                    </optgroup>
-                    {availableVoices.pyttsx3 && availableVoices.pyttsx3.length > 0 && (
-                      <optgroup label="System Voices">
-                        {availableVoices.pyttsx3.map(voice => (
+            {/* Voice selector */}
+            <div className="voice-selector">
+              <label htmlFor="voice-select" className="control-label">
+                Voice:
+              </label>
+              {loadingVoices ? (
+                <span className="loading-voices">Loading voices...</span>
+              ) : (
+                <select
+                  id="voice-select"
+                  value={selectedVoice || ''}
+                  onChange={handleVoiceChange}
+                  className="voice-select"
+                  disabled={loadingVoices}
+                >
+                  {preferOfflineTTS ? (
+                    <>
+                      <optgroup label="Windows Voices">
+                        {availableVoices.windows_sapi && availableVoices.windows_sapi.map(voice => (
                           <option key={voice.id} value={voice.id}>
                             {voice.name} ({voice.language})
                           </option>
                         ))}
                       </optgroup>
-                    )}
-                  </select>
-                )}
-              </div>
-            )}
+                      {availableVoices.pyttsx3 && availableVoices.pyttsx3.length > 0 && (
+                        <optgroup label="System Voices">
+                          {availableVoices.pyttsx3.map(voice => (
+                            <option key={voice.id} value={voice.id}>
+                              {voice.name} ({voice.language})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  ) : (
+                    <optgroup label="Online Voices">
+                      {availableVoices.online && availableVoices.online.map(voice => (
+                        <option key={voice.id} value={voice.id}>
+                          {voice.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              )}
+            </div>
 
             {selectedText && !isAnnotating && (
               <button onClick={startAnnotation} className="annotate-button">
@@ -815,7 +951,7 @@ const EnhancedDocumentViewer = () => {
         <div className="annotations-sidebar">
           <div className="annotations-panel">
             <h3>Annotations</h3>
-            {annotations.length === 0 ? (
+            {!Array.isArray(annotations) || annotations.length === 0 ? (
               <p>No annotations yet. Select text to create annotations.</p>
             ) : (
               <ul className="annotations-list">

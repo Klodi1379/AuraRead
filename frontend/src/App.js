@@ -19,7 +19,7 @@ import Footer from './components/Footer';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useSelector((state) => state.auth);
-  
+
   // Show loading indicator if auth state is still being determined
   if (loading) {
     return (
@@ -31,22 +31,32 @@ const ProtectedRoute = ({ children }) => {
       </div>
     );
   }
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
-  
+
   return children;
 };
 
 function AppContent() {
   const dispatch = useDispatch();
   const { token } = useSelector((state) => state.auth);
-  
+
   useEffect(() => {
     // If we have a token, verify the user
     if (token) {
-      dispatch(getCurrentUser());
+      console.log('Token found, verifying user...');
+      dispatch(getCurrentUser())
+        .unwrap()
+        .then(userData => {
+          console.log('User verified successfully:', userData);
+        })
+        .catch(error => {
+          console.error('Error verifying user:', error);
+        });
+    } else {
+      console.log('No token found, user needs to log in');
     }
   }, [dispatch, token]);
 
